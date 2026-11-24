@@ -1,0 +1,21 @@
+{
+  "name": "care_ga_fe",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "concurrently -n 'build,serve' -c 'green.bold,blue.bold' 'vite build --watch' 'vite preview'",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@originjs/vite-plugin-federation": "^1.4.1",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.4"
+  },
+  "engines": {
+    "node": ">=22.9.0"
+  }
+}
