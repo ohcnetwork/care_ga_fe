@@ -15,27 +15,36 @@ declare global {
   }
 }
 
+const PRIVACY_SETTINGS = {
+  send_page_view: false,
+  allow_google_signals: false,
+  allow_ad_personalization_signals: false,
+} as const;
+
 let lastPath: string | undefined;
 
 /**
- * Point every later event at the sanitized URL, then record a page view.
- * The page title is the route shape, not `document.title`, because a title
- * can carry a patient's name.
+ * Record a page view for the sanitized URL. The page title is the route
+ * shape, not `document.title`, because a title can carry a patient's name.
+ *
+ * GA4 ignores `gtag("set", { page_location })` once the tag is configured,
+ * so the fields go on the page_view itself, and `config` is re-applied so
+ * that any later event on this page reports the same sanitized URL.
  */
-function trackPage(gtag: Gtag): void {
+function trackPage(gtag: Gtag, measurementId: string): void {
   const path = sanitizePath(location.pathname);
   if (path === lastPath) return; // query-only changes are not new pages
-  const referrer = lastPath
-    ? location.origin + lastPath
-    : sanitizeUrl(document.referrer);
+  const page = {
+    page_location: location.origin + path,
+    page_referrer: lastPath
+      ? location.origin + lastPath
+      : sanitizeUrl(document.referrer),
+    page_title: path,
+  };
   lastPath = path;
 
-  gtag("set", {
-    page_location: location.origin + path,
-    page_referrer: referrer,
-    page_title: path,
-  });
-  gtag("event", "page_view");
+  gtag("config", measurementId, { ...PRIVACY_SETTINGS, ...page });
+  gtag("event", "page_view", { ...page, send_to: measurementId });
 }
 
 function watchRouteChanges(onChange: () => void): void {
@@ -63,14 +72,7 @@ function initializeAnalytics(measurementId: string): void {
   window.gtag = gtag;
 
   gtag("js", new Date());
-  gtag("config", measurementId, {
-    send_page_view: false,
-    page_location: location.origin + sanitizePath(location.pathname),
-    page_referrer: sanitizeUrl(document.referrer),
-    page_title: sanitizePath(location.pathname),
-    allow_google_signals: false,
-    allow_ad_personalization_signals: false,
-  });
+  trackPage(gtag, measurementId);
 
   const script = document.createElement("script");
   script.id = GOOGLE_ANALYTICS_SCRIPT_ID;
@@ -78,8 +80,7 @@ function initializeAnalytics(measurementId: string): void {
   script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
   document.head.appendChild(script);
 
-  trackPage(gtag);
-  watchRouteChanges(() => trackPage(gtag));
+  watchRouteChanges(() => trackPage(gtag, measurementId));
 }
 
 function initializeWhenConfigured(startedAt = Date.now()): void {
